@@ -24,8 +24,8 @@ clear
 echo "1、配置软件安装源，安装所需软件"
 yum install -y epel-release
 yum install -y http://repo.zabbix.com/zabbix/3.4/rhel/7/x86_64/zabbix-release-3.4-2.el7.noarch.rpm
-yum install -y zabbix-agent mariadb mariadb-server zabbix-server-mysql zabbix-web-mysql
-yum install -y python-pip net-snmp net-snmp-utils ntpdate wget vim
+yum install -y mariadb mariadb-server zabbix-server-mysql zabbix-web-mysql zabbix-agent
+yum install -y python-pip net-snmp net-snmp-utils ntpdate wget
 yum -y update
 
 echo "同步服务器时间"
@@ -49,8 +49,6 @@ echo "grant all privileges on zabbix.* to zabbix@localhost identified by 'Passw0
 echo "导入zabbix数据......"
 echo "zcat /usr/share/doc/zabbix-server-mysql-3.4.*/create.sql.gz | mysql -uzabbix -p'Passw0rd' zabbix"
 zcat /usr/share/doc/zabbix-server-mysql-3.4.*/create.sql.gz | mysql -uzabbix -p'Passw0rd' zabbix
-echo "zabbix数据导入完成。"
-sleep 1
 
 if [ -f "zabbix-mysql.sql" ]; then
     echo "zabbix数据表分区..."
@@ -84,6 +82,22 @@ sed -i '/^# TrendCacheSize=/a TrendCacheSize=64M' /etc/zabbix/zabbix_server.conf
 echo "ValueCacheSize=128M"
 sed -i '/^# ValueCacheSize=/a ValueCacheSize=128M' /etc/zabbix/zabbix_server.conf
 
+echo "修改PHP配置"
+echo "php_value memory_limit 128M"
+sed -i 's/memory_limit 128M/memory_limit 256M/' /etc/httpd/conf.d/zabbix.conf
+echo "php_value post_max_size 32M"
+sed -i 's/post_max_size 16M/post_max_size 32M/' /etc/httpd/conf.d/zabbix.conf
+echo "php_value upload_max_filesize 4M"
+sed -i 's/upload_max_filesize 2M/upload_max_filesize 4M/' /etc/httpd/conf.d/zabbix.conf
+echo "php_value date.timezone Asia/Shanghai"
+sed -i '/date.timezone/c\        php_value date.timezone Asia\/Shanghai' /etc/httpd/conf.d/zabbix.conf
+
+echo "修改SELINUX配置"
+#setsebool -P httpd_can_connect_zabbix on
+echo "SELINUX=permissive"
+setenforce 0
+sed -i -e 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
+
 echo "写入Zabbix配置"
 echo "/etc/zabbix/web/zabbix.conf.php"
 cat > /etc/zabbix/web/zabbix.conf.php <<EOF
@@ -107,16 +121,6 @@ global \$DB;
 
 \$IMAGE_FORMAT_DEFAULT = IMAGE_FORMAT_PNG;
 EOF
-
-echo "修改PHP时区"
-echo "php_value date.timezone Asia/Shanghai"
-sed -i '/date.timezone/c php_value date.timezone Asia\/Shanghai' /etc/httpd/conf.d/zabbix.conf
-
-echo "修改SELINUX配置"
-#setsebool -P httpd_can_connect_zabbix on
-echo "SELINUX=permissive"
-setenforce 0
-sed -i -e 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
 
 echo "修改DocumentRoot为Zabbix页面"
 echo 'DocumentRoot "/usr/share/zabbix"'
