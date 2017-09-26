@@ -183,13 +183,13 @@ DELIMITER ;
 DELIMITER $$
 CREATE PROCEDURE `partition_maintenance_all`(SCHEMA_NAME VARCHAR(32))
 BEGIN
-                CALL partition_maintenance(SCHEMA_NAME, 'history', 31, 24, 10);
-                CALL partition_maintenance(SCHEMA_NAME, 'history_log', 31, 24, 10);
-                CALL partition_maintenance(SCHEMA_NAME, 'history_str', 31, 24, 10);
-                CALL partition_maintenance(SCHEMA_NAME, 'history_text', 31, 24, 10);
-                CALL partition_maintenance(SCHEMA_NAME, 'history_uint', 31, 24, 10);
-                CALL partition_maintenance(SCHEMA_NAME, 'trends', 365, 24, 10);
-                CALL partition_maintenance(SCHEMA_NAME, 'trends_uint', 365, 24, 10);
+                CALL partition_maintenance(SCHEMA_NAME, 'history', 15, 24, 10);
+                CALL partition_maintenance(SCHEMA_NAME, 'history_log', 15, 24, 10);
+                CALL partition_maintenance(SCHEMA_NAME, 'history_str', 15, 24, 10);
+                CALL partition_maintenance(SCHEMA_NAME, 'history_text', 15, 24, 10);
+                CALL partition_maintenance(SCHEMA_NAME, 'history_uint', 15, 24, 10);
+                CALL partition_maintenance(SCHEMA_NAME, 'trends', 365, 240, 3);
+                CALL partition_maintenance(SCHEMA_NAME, 'trends_uint', 365, 240, 3);
 END$$
 DELIMITER ;
 
