@@ -1,36 +1,63 @@
 #!/bin/sh
 #此脚本只能用于CentOS 7，全新安装Zabbix Server和Grafana。
-echo "0、配置数据库分区[可选项]"
-if [ -b "/dev/sdb" ]; then
-echo "pvcreate /dev/sdb"
-    pvcreate /dev/sdb
-echo "vgcreate vg_zabbixdb /dev/sdb"
-    vgcreate vg_zabbixdb /dev/sdb
+#预设输入超时时间
+timeout=120
+#预设密码
+passwd='Passw0rd'
+#预设企业微信Corpid
+Corpid='CCCCCCCCCCCCCCCCCC'
+#预设企业应用Secret
+Secret='SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS'
+#预设企业应用Agentid
+Agentid='1'
+
+echo "0、配置数据库LVM卷[可选项]"
+echo "请输入要添加的磁盘（如“sdb”）[直接按回车跳过]："
+read -t $timeout -p "/dev/" disk
+disk=${disk%\/}
+disk='/dev/'${disk##*\/}
+if [ -b "$disk" ]; then
+    echo "pvcreate $disk"
+    pvcreate $disk
+    echo "vgcreate vg_zabbixdb $disk"
+    vgcreate vg_zabbixdb $disk
     free_pe=$(vgdisplay vg_zabbixdb | grep "Free" | awk '{print $5}')
-echo "lvcreate -l $free_pe -n lv_mariadb vg_zabbixdb"
+    echo "lvcreate -l $free_pe -n lv_mariadb vg_zabbixdb"
     lvcreate -l $free_pe -n lv_mariadb vg_zabbixdb
     unset free_pe
-echo "mkfs.xfs /dev/vg_zabbixdb/lv_mariadb"
+    echo "mkfs.xfs /dev/vg_zabbixdb/lv_mariadb"
     mkfs.xfs /dev/vg_zabbixdb/lv_mariadb
-echo "mkdir /var/lib/mysql"
+    echo "mkdir /var/lib/mysql"
     mkdir /var/lib/mysql
-echo "mount /dev/mapper/vg_zabbixdb-lv_mariadb /var/lib/mysql"
+    echo "mount /dev/mapper/vg_zabbixdb-lv_mariadb /var/lib/mysql"
     mount /dev/mapper/vg_zabbixdb-lv_mariadb /var/lib/mysql
     echo '/dev/mapper/vg_zabbixdb-lv_mariadb /var/lib/mysql xfs  defaults  0 0' >> /etc/fstab
+else
+    echo "未指定有效磁盘设备，忽略添加数据库分区..."
 fi
 sleep 2
 clear
 
 echo "1、配置软件安装源，安装所需软件"
 yum install -y epel-release
+yum -y update
 yum install -y http://repo.zabbix.com/zabbix/3.4/rhel/7/x86_64/zabbix-release-3.4-2.el7.noarch.rpm
 yum install -y mariadb mariadb-server zabbix-server-mysql zabbix-web-mysql zabbix-agent
 yum install -y python-pip net-snmp net-snmp-utils ntpdate wget
-yum -y update
 
 echo "同步服务器时间"
 echo "ntpdate cn.pool.ntp.org"
 ntpdate cn.pool.ntp.org
+echo -n "添加定时同步时钟任务请按Y(yes): "
+read -t $timeout need
+case $need in
+    yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
+        echo "59 23 * * * ntpdate cn.pool.ntp.org"
+        echo "59 23 * * * ntpdate cn.pool.ntp.org" >> /var/spool/cron/root
+    ;;
+    *)
+    ;;
+esac
 sleep 1
 clear
 
@@ -44,26 +71,26 @@ echo "创建zabbix数据库"
 echo "MariaDB > create database zabbix character set utf8 collate utf8_bin;"
 echo "create database zabbix character set utf8 collate utf8_bin;" | mysql -uroot
 echo "创建zabbix用户，并设置权限和密码"
-echo "MariaDB > grant all privileges on zabbix.* to zabbix@localhost identified by 'Passw0rd';"
-echo "grant all privileges on zabbix.* to zabbix@localhost identified by 'Passw0rd';" | mysql -uroot
+echo "MariaDB > grant all privileges on zabbix.* to zabbix@localhost identified by 'password';"
+echo "grant all privileges on zabbix.* to zabbix@localhost identified by '$passwd';" | mysql -uroot
 echo "导入zabbix数据......"
-echo "zcat /usr/share/doc/zabbix-server-mysql-3.4.*/create.sql.gz | mysql -uzabbix -p'Passw0rd' zabbix"
-zcat /usr/share/doc/zabbix-server-mysql-3.4.*/create.sql.gz | mysql -uzabbix -p'Passw0rd' zabbix
+echo "zcat /usr/share/doc/zabbix-server-mysql-3.4.*/create.sql.gz | mysql -uzabbix -p'password' zabbix"
+zcat /usr/share/doc/zabbix-server-mysql-3.4.*/create.sql.gz | mysql -uzabbix -p"$passwd" zabbix
 
 if [ -f "zabbix-mysql.sql" ]; then
     echo "zabbix数据表分区..."
-    mysql -uzabbix -p'Passw0rd' zabbix < zabbix-mysql.sql
-    mysql -uzabbix -p'Passw0rd' zabbix -e "CALL partition_maintenance_all('zabbix');"
+    mysql -uzabbix -p"$passwd" zabbix < zabbix-mysql.sql
+    mysql -uzabbix -p"$passwd" zabbix -e "CALL partition_maintenance_all('zabbix');"
     echo "添加定时维护任务..."
-    echo "01 01 * * * mysql -uzabbix -p'Passw0rd' zabbix -e \"CALL partition_maintenance_all('zabbix');\""
-    echo "01 01 * * * mysql -uzabbix -p'Passw0rd' zabbix -e \"CALL partition_maintenance_all('zabbix');\"" >> /var/spool/cron/root
+    echo "01 01 * * * mysql -uzabbix -p'password' zabbix -e \"CALL partition_maintenance_all('zabbix');\""
+    echo "01 01 * * * mysql -uzabbix -p'$passwd' zabbix -e \"CALL partition_maintenance_all('zabbix');\"" >> /var/spool/cron/root
 fi
 sleep 1
 clear
 
 echo "3、修改Zabbix服务器配置"
 echo "修改数据库密码"
-sed -i '/^# DBPassword=/a DBPassword=Passw0rd' /etc/zabbix/zabbix_server.conf
+sed -i "/^# DBPassword=/a DBPassword=$passwd" /etc/zabbix/zabbix_server.conf
 echo "其它配置优化"
 echo "StartPingers=4"
 sed -i '/^# StartPingers=/a StartPingers=4' /etc/zabbix/zabbix_server.conf
@@ -110,7 +137,7 @@ global \$DB;
 \$DB['PORT']     = '0';
 \$DB['DATABASE'] = 'zabbix';
 \$DB['USER']     = 'zabbix';
-\$DB['PASSWORD'] = 'Passw0rd';
+\$DB['PASSWORD'] = '$passwd';
 
 // Schema name. Used for IBM DB2 and PostgreSQL.
 \$DB['SCHEMA'] = '';
@@ -169,37 +196,58 @@ echo "4、添加微信报警脚本"
 echo "安装requests"
 pip install requests
 pip install --upgrade requests
-echo "下载脚本..."
-wget -O /usr/lib/zabbix/alertscripts/wechat.py https://github.com/X-Mars/Zabbix-Alert-WeChat/raw/master/wechat.py
-echo "添加企业号应用信息..."
-sed -i 's/Corpid = ".*"/Corpid = "**你的CORPID**"/g' /usr/lib/zabbix/alertscripts/wechat.py
-sed -i 's/Secret = ".*"/Secret = "**你的Secret**"/g' /usr/lib/zabbix/alertscripts/wechat.py
-sed -i 's/Agentid = ".*"/Agentid = "**你的Agentid**"/g' /usr/lib/zabbix/alertscripts/wechat.py
+echo "下载报警脚本..."
+wget -O /usr/lib/zabbix/alertscripts/wechat.py https://raw.githubusercontent.com/X-Mars/Zabbix-Alert-WeChat/master/wechat.py
+echo "添加企业应用信息..."
+read -t $timeout -p "请输入企业微信Corpid：" myCorpid
+if [ ! $myCorpid ]; then
+    myCorpid="$Corpid"
+fi
+sed -i "s/Corpid = \".*\"/Corpid = \"$myCorpid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
+read -t $timeout -p "请输入企业应用Secret：" mySecret
+if [ ! $mySecret ]; then
+    mySecret="$Secret"
+fi
+sed -i "s/Secret = \".*\"/Secret = \"$mySecret\"/g" /usr/lib/zabbix/alertscripts/wechat.py
+read -t $timeout -p "请输入企业应用Agentid：" myAgentid
+if [ ! $myAgentid ]; then
+    myAgentid="$Agentid"
+fi
+sed -i "s/Agentid = \".*\"/Agentid = \"$myAgentid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
 echo "/usr/lib/zabbix/alertscripts/wechat.py"
 chmod +x /usr/lib/zabbix/alertscripts/wechat.py
 sleep 2
 clear
 
-echo "5、安装Grafana"
-yum install -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-4.5.1-1.x86_64.rpm
-echo "启动Grafana，并设置为开机启动"
-echo "systemctl start grafana-server"
-systemctl start grafana-server
-echo "systemctl enable grafana-server"
-systemctl enable grafana-server
-echo "安装Zabbix插件"
-echo "grafana-cli plugins install alexanderzobnin-zabbix-app"
-grafana-cli plugins install alexanderzobnin-zabbix-app
-echo "安装其它图形插件"
-echo "grafana-cli plugins install grafana-piechart-panel"
-grafana-cli plugins install grafana-piechart-panel
-echo "grafana-cli plugins install vonage-status-panel"
-grafana-cli plugins install vonage-status-panel
-systemctl restart grafana-server
-echo "防火墙放行"
-echo "firewall-cmd  --permanent --add-port=3000/tcp"
-firewall-cmd  --permanent --add-port=3000/tcp
-echo "systemctl restart firewalld"
-systemctl restart firewalld
+echo "5、安装Grafana [可选项]"
+echo -n "确认安装Grafana请按Y(yes): "
+read -t $timeout need
+case $need in
+    yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
+        yum install -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-4.5.1-1.x86_64.rpm
+        echo "启动Grafana，并设置为开机启动"
+        echo "systemctl start grafana-server"
+        systemctl start grafana-server
+        echo "systemctl enable grafana-server"
+        systemctl enable grafana-server
+        echo "安装Zabbix插件"
+        echo "grafana-cli plugins install alexanderzobnin-zabbix-app"
+        grafana-cli plugins install alexanderzobnin-zabbix-app
+        echo "安装其它图形插件"
+        echo "grafana-cli plugins install grafana-piechart-panel"
+        grafana-cli plugins install grafana-piechart-panel
+        echo "grafana-cli plugins install vonage-status-panel"
+        grafana-cli plugins install vonage-status-panel
+        systemctl restart grafana-server
+        echo "防火墙放行"
+        echo "firewall-cmd  --permanent --add-port=3000/tcp"
+        firewall-cmd  --permanent --add-port=3000/tcp
+        echo "systemctl restart firewalld"
+        systemctl restart firewalld
+    ;;
+    *)
+        echo "忽略Grafana安装..."
+    ;;
+esac
 
 echo "安装完毕！"
