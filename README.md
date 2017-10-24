@@ -13,3 +13,5 @@ Zabbix Installation on Centos 7
 3、Zabbix服务相关配置
 
 4、微信报警脚本
+
+5、Grafana安装
