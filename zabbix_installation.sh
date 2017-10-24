@@ -4,19 +4,37 @@
 timeout=120
 #预设密码
 passwd='Passw0rd'
-#预设企业微信Corpid
-Corpid='CCCCCCCCCCCCCCCCCC'
-#预设企业应用Secret
-Secret='SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS'
-#预设企业应用Agentid
-Agentid='1'
 
-echo "0、配置数据库LVM卷[可选项]"
-echo "请输入要添加的磁盘（如“sdb”）[直接按回车跳过]："
+echo "如需添加磁盘作为独立的数据库分区，请输入磁盘设备名称（如“sdb”）"
+echo "[不添加磁盘分区请直接按回车键]："
 read -t $timeout -p "/dev/" disk
+sleep 1
+read -t $timeout -p "是否添加时钟同步任务？(Yes or No):" need_ts
+sleep 1
+read -t $timeout -p "是否添加企业微信应用信息？(Yes or No): " need_wc
+case $need_wc in
+    yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
+    read -t $timeout -p "请输入企业微信Corpid：" myCorpid
+    read -t $timeout -p "请输入企业应用Secret：" mySecret
+    read -t $timeout -p "请输入企业应用Agentid：" myAgentid
+    ;;
+    *)
+    myCorpid="wx1111111111111111"
+    mySecret="SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
+    myAgentid="1"
+    ;;
+esac
+sleep 1
+read -t $timeout -p "是否需要安装Grafana？(Yes or No): " need_grafana
+sleep 1
+
+echo "开始安装..."
+sleep 1
+
 disk=${disk%\/}
 disk='/dev/'${disk##*\/}
 if [ -b "$disk" ]; then
+    echo "0、配置数据库LVM卷"
     echo "pvcreate $disk"
     pvcreate $disk
     echo "vgcreate vg_zabbixdb $disk"
@@ -35,7 +53,7 @@ if [ -b "$disk" ]; then
 else
     echo "未指定有效磁盘设备，忽略添加数据库分区..."
 fi
-sleep 2
+sleep 1
 clear
 
 echo "1、配置软件安装源，安装所需软件"
@@ -43,14 +61,12 @@ yum install -y epel-release
 yum -y update
 yum install -y http://repo.zabbix.com/zabbix/3.4/rhel/7/x86_64/zabbix-release-3.4-2.el7.noarch.rpm
 yum install -y mariadb mariadb-server zabbix-server-mysql zabbix-web-mysql zabbix-agent
-yum install -y python-pip net-snmp net-snmp-utils ntpdate wget
+yum install -y net-snmp net-snmp-utils ntpdate wget
 
 echo "同步服务器时间"
 echo "ntpdate cn.pool.ntp.org"
 ntpdate cn.pool.ntp.org
-echo -n "添加定时同步时钟任务请按Y(yes): "
-read -t $timeout need
-case $need in
+case $need_ts in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
         echo "59 23 * * * ntpdate cn.pool.ntp.org"
         echo "59 23 * * * ntpdate cn.pool.ntp.org" >> /var/spool/cron/root
@@ -121,8 +137,8 @@ sed -i '/date.timezone/c\        php_value date.timezone Asia\/Shanghai' /etc/ht
 
 echo "修改SELINUX配置"
 #setsebool -P httpd_can_connect_zabbix on
-echo "SELINUX=permissive"
 setenforce 0
+echo "SELINUX=permissive"
 sed -i -e 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
 
 echo "写入Zabbix配置"
@@ -192,38 +208,27 @@ systemctl enable zabbix-agent
 sleep 1
 clear
 
-echo "4、添加微信报警脚本"
-echo "安装requests"
-pip install requests
-pip install --upgrade requests
-echo "下载报警脚本..."
-wget -O /usr/lib/zabbix/alertscripts/wechat.py https://raw.githubusercontent.com/X-Mars/Zabbix-Alert-WeChat/master/wechat.py
-echo "添加企业应用信息..."
-read -t $timeout -p "请输入企业微信Corpid：" myCorpid
-if [ ! $myCorpid ]; then
-    myCorpid="$Corpid"
-fi
-sed -i "s/Corpid = \".*\"/Corpid = \"$myCorpid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
-read -t $timeout -p "请输入企业应用Secret：" mySecret
-if [ ! $mySecret ]; then
-    mySecret="$Secret"
-fi
-sed -i "s/Secret = \".*\"/Secret = \"$mySecret\"/g" /usr/lib/zabbix/alertscripts/wechat.py
-read -t $timeout -p "请输入企业应用Agentid：" myAgentid
-if [ ! $myAgentid ]; then
-    myAgentid="$Agentid"
-fi
-sed -i "s/Agentid = \".*\"/Agentid = \"$myAgentid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
-echo "/usr/lib/zabbix/alertscripts/wechat.py"
-chmod +x /usr/lib/zabbix/alertscripts/wechat.py
-sleep 2
+echo "4、添加企业微信报警脚本"
+cat > /usr/lib/zabbix/alertscripts/wechat.sh <<EOF
+#!/bin/bash
+CorpID="$myCorpid"
+Secret="$mySecret"
+Agentid="$myAgentid"
+Content=\$2"\n"\$(echo "\$@" | cut -d" " -f3-)
+
+GURL="https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=\$CorpID&corpsecret=\$Secret"
+Gtoken=\$(/usr/bin/curl -s -G "\$GURL" | awk -F\" '{print \$10}')
+PURL="https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=\$Gtoken"
+
+/usr/bin/curl --data-ascii '{ "touser": "'\$1'", "msgtype": "text", "agentid": "'\$Agentid'","text": {"content": "'"\${Content}"'"},"safe":"0"}' "\$PURL"
+EOF
+chmod +x /usr/lib/zabbix/alertscripts/wechat.sh
+sleep 1
 clear
 
-echo "5、安装Grafana [可选项]"
-echo -n "确认安装Grafana请按Y(yes): "
-read -t $timeout need
-case $need in
+case $need_grafana in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
+        echo "5、安装Grafana..."
         yum install -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-4.5.1-1.x86_64.rpm
         echo "启动Grafana，并设置为开机启动"
         echo "systemctl start grafana-server"
