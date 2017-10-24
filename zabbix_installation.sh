@@ -5,12 +5,12 @@ timeout=120
 #预设密码
 passwd='Passw0rd'
 
-echo "如需添加磁盘作为独立的数据库分区，请输入磁盘设备名称（如“sdb”）"
+echo "如需添加磁盘作为独立数据库分区，请输入磁盘设备名称（如“sdb”）"
 echo "[不添加磁盘分区请直接按回车键]："
-read -t $timeout -p "/dev/" disk
-sleep 1
+read -t $timeout -p "/dev/" disk_add
+echo ""
 read -t $timeout -p "是否添加时钟同步任务？(Yes or No):" need_ts
-sleep 1
+echo ""
 read -t $timeout -p "是否添加企业微信应用信息？(Yes or No): " need_wc
 case $need_wc in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
@@ -24,21 +24,20 @@ case $need_wc in
     myAgentid="1"
     ;;
 esac
-sleep 1
+echo ""
 read -t $timeout -p "是否需要安装Grafana？(Yes or No): " need_grafana
 sleep 1
-
+clear
 echo "开始安装..."
-sleep 1
 
-disk=${disk%\/}
-disk='/dev/'${disk##*\/}
-if [ -b "$disk" ]; then
+disk_add=${disk_add%\/}
+disk_add='/dev/'${disk_add##*\/}
+if [ -b "$disk_add" ]; then
     echo "0、配置数据库LVM卷"
-    echo "pvcreate $disk"
-    pvcreate $disk
-    echo "vgcreate vg_zabbixdb $disk"
-    vgcreate vg_zabbixdb $disk
+    echo "pvcreate $disk_add"
+    pvcreate $disk_add
+    echo "vgcreate vg_zabbixdb $disk_add"
+    vgcreate vg_zabbixdb $disk_add
     free_pe=$(vgdisplay vg_zabbixdb | grep "Free" | awk '{print $5}')
     echo "lvcreate -l $free_pe -n lv_mariadb vg_zabbixdb"
     lvcreate -l $free_pe -n lv_mariadb vg_zabbixdb
@@ -56,12 +55,12 @@ fi
 sleep 1
 clear
 
-echo "1、配置软件安装源，安装所需软件"
+echo "1、配置软件源，安装所需软件"
 yum install -y epel-release
 yum -y update
 yum install -y http://repo.zabbix.com/zabbix/3.4/rhel/7/x86_64/zabbix-release-3.4-2.el7.noarch.rpm
 yum install -y mariadb mariadb-server zabbix-server-mysql zabbix-web-mysql zabbix-agent
-yum install -y net-snmp net-snmp-utils ntpdate wget
+yum install -y python-pip net-snmp net-snmp-utils ntpdate wget
 
 echo "同步服务器时间"
 echo "ntpdate cn.pool.ntp.org"
@@ -72,6 +71,7 @@ case $need_ts in
         echo "59 23 * * * ntpdate cn.pool.ntp.org" >> /var/spool/cron/root
     ;;
     *)
+	echo ""
     ;;
 esac
 sleep 1
@@ -209,27 +209,22 @@ sleep 1
 clear
 
 echo "4、添加企业微信报警脚本"
-cat > /usr/lib/zabbix/alertscripts/wechat.sh <<EOF
-#!/bin/bash
-CorpID="$myCorpid"
-Secret="$mySecret"
-Agentid="$myAgentid"
-Content=\$2"\n"\$(echo "\$@" | cut -d" " -f3-)
-
-GURL="https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=\$CorpID&corpsecret=\$Secret"
-Gtoken=\$(/usr/bin/curl -s -G "\$GURL" | awk -F\" '{print \$10}')
-PURL="https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=\$Gtoken"
-
-/usr/bin/curl --data-ascii '{ "touser": "'\$1'", "msgtype": "text", "agentid": "'\$Agentid'","text": {"content": "'"\${Content}"'"},"safe":"0"}' "\$PURL"
-EOF
-chmod +x /usr/lib/zabbix/alertscripts/wechat.sh
+echo "安装requests"
+pip install requests
+pip install --upgrade requests
+echo "获取报警脚本..."
+wget -O /usr/lib/zabbix/alertscripts/wechat.py https://raw.githubusercontent.com/X-Mars/Zabbix-Alert-WeChat/master/wechat.py
+sed -i "s/Corpid = \".*\"/Corpid = \"$myCorpid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
+sed -i "s/Secret = \".*\"/Secret = \"$mySecret\"/g" /usr/lib/zabbix/alertscripts/wechat.py
+sed -i "s/Agentid = \".*\"/Agentid = \"$myAgentid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
+chmod +x /usr/lib/zabbix/alertscripts/wechat.py
 sleep 1
 clear
 
 case $need_grafana in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
         echo "5、安装Grafana..."
-        yum install -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-4.5.1-1.x86_64.rpm
+        yum install -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-4.5.2-1.x86_64.rpm
         echo "启动Grafana，并设置为开机启动"
         echo "systemctl start grafana-server"
         systemctl start grafana-server
