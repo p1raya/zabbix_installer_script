@@ -11,18 +11,22 @@ read -t $timeout -p "/dev/" disk_add
 echo ""
 read -t $timeout -p "是否添加时钟同步任务？(Yes or No):" need_ts
 echo ""
-read -t $timeout -p "是否添加企业微信应用信息？(Yes or No): " need_wc
+read -t $timeout -p "是否安装企业微信报警功能？(Yes or No): " need_wc
 case $need_wc in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
-    read -t $timeout -p "请输入企业微信Corpid：" myCorpid
-    read -t $timeout -p "请输入企业应用Secret：" mySecret
-    read -t $timeout -p "请输入企业应用Agentid：" myAgentid
-    ;;
-    *)
-    myCorpid="wx1111111111111111"
-    mySecret="SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
-    myAgentid="1"
-    ;;
+    read -t $timeout -p "是否修改企业微信应用信息？(Yes or No): " need
+    case $need in
+        yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
+            read -p "请输入企业微信Corpid：" myCorpid
+            read -p "请输入企业应用Secret：" mySecret
+            read -p "请输入企业应用Agentid：" myAgentid
+        ;;
+        *)
+            myCorpid="wx1111111111111111"
+            mySecret="SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
+            myAgentid="1"
+        ;;
+    esac
 esac
 echo ""
 read -t $timeout -p "是否需要安装Grafana？(Yes or No): " need_grafana
@@ -59,8 +63,7 @@ echo "1、配置软件源，安装所需软件"
 yum install -y epel-release
 yum -y update
 yum install -y http://repo.zabbix.com/zabbix/3.4/rhel/7/x86_64/zabbix-release-3.4-2.el7.noarch.rpm
-yum install -y mariadb mariadb-server zabbix-server-mysql zabbix-web-mysql zabbix-agent
-yum install -y python-pip net-snmp net-snmp-utils ntpdate wget
+yum install -y mariadb mariadb-server zabbix-server-mysql zabbix-web-mysql zabbix-agent net-snmp net-snmp-utils ntpdate wget
 
 echo "同步服务器时间"
 echo "ntpdate cn.pool.ntp.org"
@@ -71,7 +74,7 @@ case $need_ts in
         echo "59 23 * * * ntpdate cn.pool.ntp.org" >> /var/spool/cron/root
     ;;
     *)
-	echo ""
+        echo ""
     ;;
 esac
 sleep 1
@@ -208,16 +211,24 @@ systemctl enable zabbix-agent
 sleep 1
 clear
 
-echo "4、添加企业微信报警脚本"
-echo "安装requests"
-pip install requests
-pip install --upgrade requests
-echo "获取报警脚本..."
-wget -O /usr/lib/zabbix/alertscripts/wechat.py https://raw.githubusercontent.com/X-Mars/Zabbix-Alert-WeChat/master/wechat.py
-sed -i "s/Corpid = \".*\"/Corpid = \"$myCorpid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
-sed -i "s/Secret = \".*\"/Secret = \"$mySecret\"/g" /usr/lib/zabbix/alertscripts/wechat.py
-sed -i "s/Agentid = \".*\"/Agentid = \"$myAgentid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
-chmod +x /usr/lib/zabbix/alertscripts/wechat.py
+case $need_wc in
+    yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
+        echo "4、添加企业微信报警脚本"
+        echo "安装requests"
+        yum install -y python-pip 
+        pip install requests
+        pip install --upgrade requests
+        echo "获取报警脚本..."
+        wget -O /usr/lib/zabbix/alertscripts/wechat.py https://raw.githubusercontent.com/X-Mars/Zabbix-Alert-WeChat/master/wechat.py
+        sed -i "s/Corpid = \".*\"/Corpid = \"$myCorpid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
+        sed -i "s/Secret = \".*\"/Secret = \"$mySecret\"/g" /usr/lib/zabbix/alertscripts/wechat.py
+        sed -i "s/Agentid = \".*\"/Agentid = \"$myAgentid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
+        chmod +x /usr/lib/zabbix/alertscripts/wechat.py
+    ;;
+    *)
+    echo "忽略企业微信报警功能安装..."
+    ;;
+esac
 sleep 1
 clear
 
