@@ -9,6 +9,8 @@ echo "如需添加磁盘作为独立数据库分区，请输入磁盘设备名�
 echo "[不添加磁盘分区请直接按回车键]："
 read -t $timeout -p "/dev/" disk_add
 echo ""
+read -t $timeout -p "是否在安装前更新系统？(Yes or No):" need_up
+echo ""
 read -t $timeout -p "是否添加时钟同步任务？(Yes or No):" need_ts
 echo ""
 read -t $timeout -p "是否安装企业微信报警功能？(Yes or No): " need_wc
@@ -61,7 +63,11 @@ clear
 
 echo "1、配置软件源，安装所需软件"
 yum install -y epel-release
-yum -y update
+case $need_up in
+    yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
+        yum -y update
+    ;;
+esac
 yum install -y http://repo.zabbix.com/zabbix/3.4/rhel/7/x86_64/zabbix-release-3.4-2.el7.noarch.rpm
 yum install -y mariadb mariadb-server zabbix-server-mysql zabbix-web-mysql zabbix-agent net-snmp net-snmp-utils ntpdate wget
 
@@ -109,24 +115,24 @@ clear
 
 echo "3、修改Zabbix服务器配置"
 echo "修改数据库密码"
-sed -i "/^# DBPassword=/a DBPassword=$passwd" /etc/zabbix/zabbix_server.conf
+sed -i "/^# DBPassword=/c DBPassword=$passwd" /etc/zabbix/zabbix_server.conf
 echo "其它配置优化"
 echo "StartPingers=4"
-sed -i '/^# StartPingers=/a StartPingers=4' /etc/zabbix/zabbix_server.conf
+sed -i '/^# StartPingers=/c StartPingers=4' /etc/zabbix/zabbix_server.conf
 echo "StartDiscoverers=8"
-sed -i '/^# StartDiscoverers=/a StartDiscoverers=8' /etc/zabbix/zabbix_server.conf
+sed -i '/^# StartDiscoverers=/c StartDiscoverers=8' /etc/zabbix/zabbix_server.conf
 echo "CacheSize=128M"
-sed -i '/^# CacheSize=/a CacheSize=128M' /etc/zabbix/zabbix_server.conf
+sed -i '/^# CacheSize=/c CacheSize=128M' /etc/zabbix/zabbix_server.conf
 echo "CacheUpdateFrequency=120"
-sed -i '/^# CacheUpdateFrequency=/a CacheUpdateFrequency=120' /etc/zabbix/zabbix_server.conf
+sed -i '/^# CacheUpdateFrequency=/c CacheUpdateFrequency=120' /etc/zabbix/zabbix_server.conf
 echo "HistoryCacheSize=256M"
-sed -i '/^# HistoryCacheSize=/a HistoryCacheSize=256M' /etc/zabbix/zabbix_server.conf
+sed -i '/^# HistoryCacheSize=/c HistoryCacheSize=256M' /etc/zabbix/zabbix_server.conf
 echo "HistoryIndexCacheSize=64M"
-sed -i '/^# HistoryIndexCacheSize=/a HistoryIndexCacheSize=64M' /etc/zabbix/zabbix_server.conf
+sed -i '/^# HistoryIndexCacheSize=/c HistoryIndexCacheSize=64M' /etc/zabbix/zabbix_server.conf
 echo "TrendCacheSize=64M"
-sed -i '/^# TrendCacheSize=/a TrendCacheSize=64M' /etc/zabbix/zabbix_server.conf
+sed -i '/^# TrendCacheSize=/c TrendCacheSize=64M' /etc/zabbix/zabbix_server.conf
 echo "ValueCacheSize=128M"
-sed -i '/^# ValueCacheSize=/a ValueCacheSize=128M' /etc/zabbix/zabbix_server.conf
+sed -i '/^# ValueCacheSize=/c ValueCacheSize=128M' /etc/zabbix/zabbix_server.conf
 
 echo "修改PHP配置"
 echo "php_value memory_limit 128M"
@@ -235,7 +241,7 @@ clear
 case $need_grafana in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
         echo "5、安装Grafana..."
-        yum install -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-4.5.2-1.x86_64.rpm
+        yum install -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-4.6.3-1.x86_64.rpm
         echo "启动Grafana，并设置为开机启动"
         echo "systemctl start grafana-server"
         systemctl start grafana-server
