@@ -225,6 +225,7 @@ case $need_wc in
         pip install requests
         pip install --upgrade requests
         echo "获取报警脚本..."
+        echo "脚本作者：火星小刘（https://github.com/X-Mars/Quick-Installation-ZABBIX）"
         wget -O /usr/lib/zabbix/alertscripts/wechat.py https://raw.githubusercontent.com/X-Mars/Zabbix-Alert-WeChat/master/wechat.py
         sed -i "s/Corpid = \".*\"/Corpid = \"$myCorpid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
         sed -i "s/Secret = \".*\"/Secret = \"$mySecret\"/g" /usr/lib/zabbix/alertscripts/wechat.py
@@ -241,7 +242,7 @@ clear
 case $need_grafana in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
         echo "5、安装Grafana..."
-        yum install -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-4.6.3-1.x86_64.rpm
+        yum install -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-5.1.3-1.x86_64.rpm
         echo "启动Grafana，并设置为开机启动"
         echo "systemctl start grafana-server"
         systemctl start grafana-server
