@@ -1,7 +1,8 @@
 #!/bin/bash
+#https://github.com/p1raya/zabbix_installer_script
 #此脚本只能用于CentOS 7，全新安装Zabbix Server和Grafana。
-#以下为软件安装预设信息，需在安装前修改好
 
+#以下为软件安装预设信息，需在安装前修改好
 #预设Zabbix数据库密码
 DB_PASSWORD='Passw0rd'
 
