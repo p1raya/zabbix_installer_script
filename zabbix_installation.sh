@@ -1,158 +1,141 @@
-#!/bin/sh
+#!/bin/bash
 #此脚本只能用于CentOS 7，全新安装Zabbix Server和Grafana。
-#预设输入超时时间
-timeout=120
-#预设密码
-passwd='Passw0rd'
+#以下为软件安装预设信息，需在安装前修改好
 
-echo "如需添加磁盘作为独立数据库分区，请输入磁盘设备名称（如“sdb”）"
-echo "[不添加磁盘分区请直接按回车键]："
-read -t $timeout -p "/dev/" disk_add
-echo ""
-read -t $timeout -p "是否在安装前更新系统？(Yes or No):" need_up
-echo ""
-read -t $timeout -p "是否添加时钟同步任务？(Yes or No):" need_ts
-echo ""
-read -t $timeout -p "是否安装企业微信报警功能？(Yes or No): " need_wc
-case $need_wc in
-    yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
-    read -t $timeout -p "是否修改企业微信应用信息？(Yes or No): " need
-    case $need in
-        yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
-            read -p "请输入企业微信Corpid：" myCorpid
-            read -p "请输入企业应用Secret：" mySecret
-            read -p "请输入企业应用Agentid：" myAgentid
-        ;;
-        *)
-            myCorpid="wx1111111111111111"
-            mySecret="SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
-            myAgentid="1"
-        ;;
-    esac
-esac
-echo ""
-read -t $timeout -p "是否需要安装Grafana？(Yes or No): " need_grafana
-sleep 1
-clear
+#预设Zabbix数据库密码
+DB_PASSWORD='Passw0rd'
+
+#添加磁盘作为独立数据库分区（无需要添加请置空）
+DISK_MYSQL="/dev/sdb"
+
+#是否在安装前更新系统？(Yes or No)
+NEED_UPDATE=Yes
+
+#是否添加时钟同步任务？(Yes or No)
+NEED_NTP=Yes
+
+#NTP服务器地址
+NTP_SERVER="cn.pool.ntp.org"
+
+#是否将DocumentRoot设置为Zabbix页面？(Yes or No)
+NEED_DOCUMENTROOT=Yes
+
+#是否安装企业微信报警功能？(Yes or No)
+NEED_WECHAT=Yes
+#企业微信应用信息（不安装请置空）
+MYCORPID=""
+MYSECRET=""
+MYAGENTID="1"
+
+#是否需要安装Grafana？(Yes or No):
+NEED_GRAFANA=Yes
+
 echo "开始安装..."
 
-disk_add=${disk_add%\/}
-disk_add='/dev/'${disk_add##*\/}
-if [ -b "$disk_add" ]; then
-    echo "0、配置数据库LVM卷"
-    echo "pvcreate $disk_add"
-    pvcreate $disk_add
-    echo "vgcreate vg_zabbixdb $disk_add"
-    vgcreate vg_zabbixdb $disk_add
+if [ -b "$DISK_MYSQL" ]; then
+    #"配置数据库专用LVM卷"
+    pvcreate -q $DISK_MYSQL
+    vgcreate -q vg_zabbixdb $DISK_MYSQL
     free_pe=$(vgdisplay vg_zabbixdb | grep "Free" | awk '{print $5}')
-    echo "lvcreate -l $free_pe -n lv_mariadb vg_zabbixdb"
-    lvcreate -l $free_pe -n lv_mariadb vg_zabbixdb
-    unset free_pe
-    echo "mkfs.xfs /dev/vg_zabbixdb/lv_mariadb"
-    mkfs.xfs /dev/vg_zabbixdb/lv_mariadb
-    echo "mkdir /var/lib/mysql"
+    lvcreate -q -l $free_pe -n lv_mariadb vg_zabbixdb
+    mkfs.xfs /dev/vg_zabbixdb/lv_mariadb > /dev/null
     mkdir /var/lib/mysql
-    echo "mount /dev/mapper/vg_zabbixdb-lv_mariadb /var/lib/mysql"
-    mount /dev/mapper/vg_zabbixdb-lv_mariadb /var/lib/mysql
+    mount /dev/mapper/vg_zabbixdb-lv_mariadb /var/lib/mysql \
+	&& echo "磁盘\"$DISK_MYSQL\"配置LVM并挂载完成"
     echo '/dev/mapper/vg_zabbixdb-lv_mariadb /var/lib/mysql xfs  defaults  0 0' >> /etc/fstab
-else
-    echo "未指定有效磁盘设备，忽略添加数据库分区..."
 fi
-sleep 1
-clear
 
-echo "1、配置软件源，安装所需软件"
-yum install -y epel-release
-case $need_up in
+#配置软件源，安装所需软件
+yum install -q -y epel-release
+case $NEED_UPDATE in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
-        yum -y update
-    ;;
+        yum -q -y update && echo "系统更新完成"
+        ;;
 esac
-yum install -y http://repo.zabbix.com/zabbix/3.4/rhel/7/x86_64/zabbix-release-3.4-2.el7.noarch.rpm
-yum install -y mariadb mariadb-server zabbix-server-mysql zabbix-web-mysql zabbix-agent net-snmp net-snmp-utils ntpdate wget
+echo "下载并安装 Zabbix 及相关依赖软件包"
+yum install -q -y http://repo.zabbix.com/zabbix/3.4/rhel/7/x86_64/zabbix-release-3.4-2.el7.noarch.rpm
+yum install -q -y mariadb-server zabbix-server-mysql zabbix-web-mysql zabbix-agent net-snmp net-snmp-utils ntp \
+    && echo "Zabbix 软件包安装完成" || { echo "Zabbix 安装失败，请检查出错原因再重试。"; exit; }
+echo -e "\n开始进行软件配置..."
 
-echo "同步服务器时间"
-echo "ntpdate cn.pool.ntp.org"
-ntpdate cn.pool.ntp.org
-case $need_ts in
+{
+#同步服务器时间
+ntpdate $NTP_SERVER > /dev/null && echo "时钟同步完成"
+case $NEED_NTP in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
-        echo "59 23 * * * ntpdate cn.pool.ntp.org"
-        echo "59 23 * * * ntpdate cn.pool.ntp.org" >> /var/spool/cron/root
-    ;;
-    *)
-        echo ""
-    ;;
+        #替换NTP Server地址，请按需自行修改或添加
+        sed -i "s/centos.pool.ntp.org/$NTP_SERVER/" /etc/ntp.conf
+        #开启ntpd服务
+        /bin/systemctl -q enable ntpd.service
+        /bin/systemctl -q start ntpd.service && echo "已启用 ntpd"
+        ;;
 esac
-sleep 1
-clear
+}&
 
-echo "2、初始化数据库"
-echo "开启独立表空间"
-echo "innodb_file_per_table=1"
+{
+#初始化数据库
+#开启独立表空间
 sed -i '/\[mysqld\]/a innodb_file_per_table=1' /etc/my.cnf
-echo "启动mariadb数据库服务"
-systemctl start mariadb
-echo "创建zabbix数据库"
-echo "MariaDB > create database zabbix character set utf8 collate utf8_bin;"
-echo "create database zabbix character set utf8 collate utf8_bin;" | mysql -uroot
-echo "创建zabbix用户，并设置权限和密码"
-echo "MariaDB > grant all privileges on zabbix.* to zabbix@localhost identified by 'password';"
-echo "grant all privileges on zabbix.* to zabbix@localhost identified by '$passwd';" | mysql -uroot
-echo "导入zabbix数据......"
-echo "zcat /usr/share/doc/zabbix-server-mysql-3.4.*/create.sql.gz | mysql -uzabbix -p'password' zabbix"
-zcat /usr/share/doc/zabbix-server-mysql-3.4.*/create.sql.gz | mysql -uzabbix -p"$passwd" zabbix
+#启动mariadb数据库服务
+/bin/systemctl -q start mariadb && echo "MariaDB 已启动"
+#创建zabbix数据库
+echo "create database zabbix character set utf8 collate utf8_bin;" | mysql -s -uroot
+#创建zabbix用户，并设置权限和密码
+echo "grant all privileges on zabbix.* to zabbix@localhost identified by '$DB_PASSWORD';" | mysql -s -uroot
+#导入zabbix数据
+zcat /usr/share/doc/zabbix-server-mysql-3.4.*/create.sql.gz | mysql -s -uzabbix -p"$DB_PASSWORD" zabbix \
+    && echo "Zabbix 数据库导入成功"
 
 if [ -f "zabbix-mysql.sql" ]; then
-    echo "zabbix数据表分区..."
-    mysql -uzabbix -p"$passwd" zabbix < zabbix-mysql.sql
-    mysql -uzabbix -p"$passwd" zabbix -e "CALL partition_maintenance_all('zabbix');"
-    echo "添加定时维护任务..."
-    echo "01 01 * * * mysql -uzabbix -p'password' zabbix -e \"CALL partition_maintenance_all('zabbix');\""
-    echo "01 01 * * * mysql -uzabbix -p'$passwd' zabbix -e \"CALL partition_maintenance_all('zabbix');\"" >> /var/spool/cron/root
+    #zabbix数据表分区
+    mysql -s -uzabbix -p"$DB_PASSWORD" zabbix < zabbix-mysql.sql
+    mysql -s -uzabbix -p"$DB_PASSWORD" zabbix -e "CALL partition_maintenance_all('zabbix');" > /dev/null \
+	&& echo "Zabbix 数据表分区完成"
+    #添加定时维护任务
+    echo "01 01 * * * mysql -uzabbix -p'$DB_PASSWORD' zabbix -e \"CALL partition_maintenance_all('zabbix');\"" >> /var/spool/cron/root
 fi
-sleep 1
-clear
+}&
 
-echo "3、修改Zabbix服务器配置"
-echo "修改数据库密码"
-sed -i "/^# DBPassword=/c DBPassword=$passwd" /etc/zabbix/zabbix_server.conf
-echo "其它配置优化"
-echo "StartPingers=4"
-sed -i '/^# StartPingers=/c StartPingers=4' /etc/zabbix/zabbix_server.conf
-echo "StartDiscoverers=8"
-sed -i '/^# StartDiscoverers=/c StartDiscoverers=8' /etc/zabbix/zabbix_server.conf
-echo "CacheSize=128M"
-sed -i '/^# CacheSize=/c CacheSize=128M' /etc/zabbix/zabbix_server.conf
-echo "CacheUpdateFrequency=120"
-sed -i '/^# CacheUpdateFrequency=/c CacheUpdateFrequency=120' /etc/zabbix/zabbix_server.conf
-echo "HistoryCacheSize=256M"
-sed -i '/^# HistoryCacheSize=/c HistoryCacheSize=256M' /etc/zabbix/zabbix_server.conf
-echo "HistoryIndexCacheSize=64M"
-sed -i '/^# HistoryIndexCacheSize=/c HistoryIndexCacheSize=64M' /etc/zabbix/zabbix_server.conf
-echo "TrendCacheSize=64M"
-sed -i '/^# TrendCacheSize=/c TrendCacheSize=64M' /etc/zabbix/zabbix_server.conf
-echo "ValueCacheSize=128M"
-sed -i '/^# ValueCacheSize=/c ValueCacheSize=128M' /etc/zabbix/zabbix_server.conf
+{
+#修改Zabbix服务器配置（非最优配置，请按需要自行修改）
+#修改数据库密码
+sed -i "/^# DBPassword=/c DBPassword=$DB_PASSWORD" /etc/zabbix/zabbix_server.conf
+#其它配置优化
+sed -i '/^# StartPingers=/c StartPingers=4' /etc/zabbix/zabbix_server.conf \
+    && echo "StartPingers=4"
+sed -i '/^# StartDiscoverers=/c StartDiscoverers=8' /etc/zabbix/zabbix_server.conf \
+    && echo "StartDiscoverers=8"
+sed -i '/^# CacheSize=/c CacheSize=128M' /etc/zabbix/zabbix_server.conf \
+    && echo "CacheSize=128M"
+sed -i '/^# CacheUpdateFrequency=/c CacheUpdateFrequency=120' /etc/zabbix/zabbix_server.conf \
+    && echo "CacheUpdateFrequency=120"
+sed -i '/^# HistoryCacheSize=/c HistoryCacheSize=256M' /etc/zabbix/zabbix_server.conf \
+    && echo "HistoryCacheSize=256M"
+sed -i '/^# HistoryIndexCacheSize=/c HistoryIndexCacheSize=64M' /etc/zabbix/zabbix_server.conf \
+    && echo "HistoryIndexCacheSize=64M"
+sed -i '/^# TrendCacheSize=/c TrendCacheSize=64M' /etc/zabbix/zabbix_server.conf \
+    && echo "TrendCacheSize=64M"
+sed -i '/^# ValueCacheSize=/c ValueCacheSize=128M' /etc/zabbix/zabbix_server.conf \
+    && echo "ValueCacheSize=128M"
 
-echo "修改PHP配置"
-echo "php_value memory_limit 128M"
-sed -i 's/memory_limit 128M/memory_limit 256M/' /etc/httpd/conf.d/zabbix.conf
-echo "php_value post_max_size 32M"
-sed -i 's/post_max_size 16M/post_max_size 32M/' /etc/httpd/conf.d/zabbix.conf
-echo "php_value upload_max_filesize 4M"
-sed -i 's/upload_max_filesize 2M/upload_max_filesize 4M/' /etc/httpd/conf.d/zabbix.conf
-echo "php_value date.timezone Asia/Shanghai"
-sed -i '/date.timezone/c\        php_value date.timezone Asia\/Shanghai' /etc/httpd/conf.d/zabbix.conf
+#修改PHP配置
+sed -i 's/memory_limit 128M/memory_limit 256M/' /etc/httpd/conf.d/zabbix.conf \
+    && echo "php_value memory_limit 128M"
+sed -i 's/post_max_size 16M/post_max_size 32M/' /etc/httpd/conf.d/zabbix.conf \
+    && echo "php_value post_max_size 32M"
+sed -i 's/upload_max_filesize 2M/upload_max_filesize 4M/' /etc/httpd/conf.d/zabbix.conf \
+    && echo "php_value upload_max_filesize 4M"
+sed -i '/date.timezone/c\        php_value date.timezone Asia\/Shanghai' /etc/httpd/conf.d/zabbix.conf \
+    && echo "php_value date.timezone Asia/Shanghai"
 
-echo "修改SELINUX配置"
+#修改SELINUX配置
 #setsebool -P httpd_can_connect_zabbix on
-setenforce 0
-echo "SELINUX=permissive"
+setenforce 0 && echo "SELinux 已停用"
+#设置"SELINUX=permissive"
 sed -i -e 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
 
-echo "写入Zabbix配置"
-echo "/etc/zabbix/web/zabbix.conf.php"
-cat > /etc/zabbix/web/zabbix.conf.php <<EOF
+#写入Zabbix配置文件"/etc/zabbix/web/zabbix.conf.php"
+cat > /etc/zabbix/web/zabbix.conf.php <<EOF && echo "zabbix.conf.php 已写入"
 <?php
 // Zabbix GUI configuration file.
 global \$DB;
@@ -162,7 +145,7 @@ global \$DB;
 \$DB['PORT']     = '0';
 \$DB['DATABASE'] = 'zabbix';
 \$DB['USER']     = 'zabbix';
-\$DB['PASSWORD'] = '$passwd';
+\$DB['PASSWORD'] = '$DB_PASSWORD';
 
 // Schema name. Used for IBM DB2 and PostgreSQL.
 \$DB['SCHEMA'] = '';
@@ -174,98 +157,78 @@ global \$DB;
 \$IMAGE_FORMAT_DEFAULT = IMAGE_FORMAT_PNG;
 EOF
 
-echo "修改DocumentRoot为Zabbix页面"
-echo 'DocumentRoot "/usr/share/zabbix"'
-sed -i '/DocumentRoot "\/var\/www\/html"/c DocumentRoot "\/usr\/share\/zabbix"' /etc/httpd/conf/httpd.conf
-echo '<Directory "/usr/share/zabbix">'
-sed -i '/<Directory "\/var\/www\/html">/c <Directory "\/usr\/share\/zabbix">' /etc/httpd/conf/httpd.conf
+#修改DocumentRoot为Zabbix页面
+case $NEED_DOCUMENTROOT in
+    yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
+        #'DocumentRoot "/usr/share/zabbix"'
+        sed -i '/DocumentRoot "\/var\/www\/html"/c DocumentRoot "\/usr\/share\/zabbix"' /etc/httpd/conf/httpd.conf
+        #'<Directory "/usr/share/zabbix">'
+        sed -i '/<Directory "\/var\/www\/html">/c <Directory "\/usr\/share\/zabbix">' /etc/httpd/conf/httpd.conf
+        ;;
+esac
 
-echo "防火墙放行服务端口"
-echo "firewall-cmd  --permanent --add-port=10050/tcp"
-firewall-cmd  --permanent --add-port=10050/tcp
-echo "firewall-cmd  --permanent --add-port=10051/tcp"
-firewall-cmd  --permanent --add-port=10051/tcp
-echo "firewall-cmd  --permanent --add-service=http"
-firewall-cmd  --permanent --add-service=http
-echo "firewall-cmd  --permanent --add-service=snmp"
-firewall-cmd  --permanent --add-service=snmp
-systemctl restart firewalld
+#防火墙放行服务端口
+firewall-cmd -q --permanent --add-port=10050/tcp
+firewall-cmd -q --permanent --add-port=10051/tcp
+firewall-cmd -q --permanent --add-service=http
+firewall-cmd -q --permanent --add-service=snmp
 
-echo "修正Zabbix图形中文字体"
+#设置服务开机启动
+/bin/systemctl -q enable mariadb
+/bin/systemctl -q enable httpd
+/bin/systemctl -q enable zabbix-server
+/bin/systemctl -q enable zabbix-agent
+}&
+
+{
+#下载SourceHanSansCN字体
 mkdir /usr/share/fonts/SourceHanSansCN
-echo "下载SourceHanSansCN..."
-wget -O /usr/share/fonts/SourceHanSansCN/SourceHanSansCN-Normal.otf https://raw.githubusercontent.com/adobe-fonts/source-han-sans/release/SubsetOTF/CN/SourceHanSansCN-Normal.otf
-ln -fs /usr/share/fonts/SourceHanSansCN/SourceHanSansCN-Normal.otf /etc/alternatives/zabbix-web-font
+curl -s -o /usr/share/fonts/SourceHanSansCN/SourceHanSansCN-Normal.otf https://raw.githubusercontent.com/adobe-fonts/source-han-sans/release/SubsetOTF/CN/SourceHanSansCN-Normal.otf
+ln -fs /usr/share/fonts/SourceHanSansCN/SourceHanSansCN-Normal.otf /etc/alternatives/zabbix-web-font \
+&& echo "Zabbix 图形字体修改为 SourceHanSansCN"
+}&
 
-echo "启动服务"
-echo "service httpd start"
-service httpd start
-echo "service zabbix-server start"
-service zabbix-server start
-echo "service zabbix-agent start"
-service zabbix-agent start
-
-echo "设置服务为开机启动"
-echo "systemctl enable mariadb"
-systemctl enable mariadb
-echo "systemctl enable httpd"
-systemctl enable httpd
-echo "systemctl enable zabbix-server"
-systemctl enable zabbix-server
-echo "systemctl enable zabbix-agent"
-systemctl enable zabbix-agent
-sleep 1
-clear
-
-case $need_wc in
+{
+case $NEED_WECHAT in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
-        echo "4、添加企业微信报警脚本"
-        echo "安装requests"
-        yum install -y python-pip 
-        pip install requests
-        pip install --upgrade requests
-        echo "获取报警脚本..."
-        echo "脚本作者：火星小刘（https://github.com/X-Mars/Quick-Installation-ZABBIX）"
-        wget -O /usr/lib/zabbix/alertscripts/wechat.py https://raw.githubusercontent.com/X-Mars/Zabbix-Alert-WeChat/master/wechat.py
-        sed -i "s/Corpid = \".*\"/Corpid = \"$myCorpid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
-        sed -i "s/Secret = \".*\"/Secret = \"$mySecret\"/g" /usr/lib/zabbix/alertscripts/wechat.py
-        sed -i "s/Agentid = \".*\"/Agentid = \"$myAgentid\"/g" /usr/lib/zabbix/alertscripts/wechat.py
+        #安装requests库
+        yum install -q -y python-pip
+        pip install -q requests
+        pip install -q --upgrade requests
+        #获取报警脚本
+        curl -s -o /usr/lib/zabbix/alertscripts/wechat.py https://raw.githubusercontent.com/X-Mars/Zabbix-Alert-WeChat/master/wechat.py \
+        && echo -e "微信报警脚本 wechat.py 已添加\n作者：火星小刘[https://github.com/X-Mars/Zabbix-Alert-WeChat]"
+        sed -i "s/Corpid = \".*\"/Corpid = \"$MYCORPID\"/g" /usr/lib/zabbix/alertscripts/wechat.py
+        sed -i "s/Secret = \".*\"/Secret = \"$MYSECRET\"/g" /usr/lib/zabbix/alertscripts/wechat.py
+        sed -i "s/Agentid = \".*\"/Agentid = \"$MYAGENTID\"/g" /usr/lib/zabbix/alertscripts/wechat.py
         chmod +x /usr/lib/zabbix/alertscripts/wechat.py
-    ;;
-    *)
-    echo "忽略企业微信报警功能安装..."
-    ;;
+        ;;
 esac
-sleep 1
-clear
 
-case $need_grafana in
+case $NEED_GRAFANA in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
-        echo "5、安装Grafana..."
-        yum install -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-5.1.3-1.x86_64.rpm
-        echo "启动Grafana，并设置为开机启动"
-        echo "systemctl start grafana-server"
-        systemctl start grafana-server
-        echo "systemctl enable grafana-server"
-        systemctl enable grafana-server
-        echo "安装Zabbix插件"
-        echo "grafana-cli plugins install alexanderzobnin-zabbix-app"
-        grafana-cli plugins install alexanderzobnin-zabbix-app
-        echo "安装其它图形插件"
-        echo "grafana-cli plugins install grafana-piechart-panel"
-        grafana-cli plugins install grafana-piechart-panel
-        echo "grafana-cli plugins install vonage-status-panel"
-        grafana-cli plugins install vonage-status-panel
-        systemctl restart grafana-server
-        echo "防火墙放行"
-        echo "firewall-cmd  --permanent --add-port=3000/tcp"
-        firewall-cmd  --permanent --add-port=3000/tcp
-        echo "systemctl restart firewalld"
-        systemctl restart firewalld
-    ;;
-    *)
-        echo "忽略Grafana安装..."
-    ;;
+        #安装Grafana
+        yum install -q -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-5.1.4-1.x86_64.rpm > /dev/null
+        #安装Zabbix插件
+        grafana-cli plugins install alexanderzobnin-zabbix-app > /dev/null && echo "Grafana 安装完成"
+        #安装其它图形插件
+        #grafana-cli plugins install grafana-piechart-panel > /dev/null
+        #grafana-cli plugins install vonage-status-panel > /dev/null
+        #防火墙放行端口TCP 3000
+        firewall-cmd -q --permanent --add-port=3000/tcp
+        #设置Grafana为开机启动
+        /bin/systemctl -q enable grafana-server.service
+        /bin/systemctl -q start grafana-server.service && echo "Grafana 已启动"
+        ;;
 esac
+}&
+
+wait
+
+#启动服务
+/bin/systemctl -q restart firewalld.service && echo "防火墙已放行服务端口"
+/bin/systemctl -q start zabbix-server.service && echo "Zabbix Server 已启动"
+/bin/systemctl -q start zabbix-agent.service && echo "Zabbix Agent 已启动"
+/bin/systemctl -q start httpd.service && echo "Apache httpd 已启动"
 
 echo "安装完毕！"
