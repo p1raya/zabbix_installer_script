@@ -16,4 +16,5 @@ Zabbix Installation on Centos 7
 
 5、Grafana安装
 
-安装前根据需求编辑好zabbix_installation.sh前面的预设信息，直接在服务器上执行该文件即可。为了加快安装速度，脚本软件配置部分并发执行。
+安装前根据需求编辑好zabbix_installation.sh前面的预设信息，直接在服务器上执行该文件即可。
+为了加快安装速度，脚本软件配置部分并发执行。
