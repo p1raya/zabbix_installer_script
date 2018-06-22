@@ -103,31 +103,31 @@ fi
 sed -i "/^# DBPassword=/c DBPassword=$DB_PASSWORD" /etc/zabbix/zabbix_server.conf
 #其它配置优化
 sed -i '/^# StartPingers=/c StartPingers=4' /etc/zabbix/zabbix_server.conf \
-    && echo "StartPingers=4"
+    && grep "StartPingers=" /etc/zabbix/zabbix_server.conf
 sed -i '/^# StartDiscoverers=/c StartDiscoverers=8' /etc/zabbix/zabbix_server.conf \
-    && echo "StartDiscoverers=8"
+    && grep "StartDiscoverers=" /etc/zabbix/zabbix_server.conf
 sed -i '/^# CacheSize=/c CacheSize=128M' /etc/zabbix/zabbix_server.conf \
-    && echo "CacheSize=128M"
+    && grep "^CacheSize=" /etc/zabbix/zabbix_server.conf
 sed -i '/^# CacheUpdateFrequency=/c CacheUpdateFrequency=120' /etc/zabbix/zabbix_server.conf \
-    && echo "CacheUpdateFrequency=120"
+    && grep "CacheUpdateFrequency=" /etc/zabbix/zabbix_server.conf
 sed -i '/^# HistoryCacheSize=/c HistoryCacheSize=256M' /etc/zabbix/zabbix_server.conf \
-    && echo "HistoryCacheSize=256M"
+    && grep "HistoryCacheSize=" /etc/zabbix/zabbix_server.conf
 sed -i '/^# HistoryIndexCacheSize=/c HistoryIndexCacheSize=64M' /etc/zabbix/zabbix_server.conf \
-    && echo "HistoryIndexCacheSize=64M"
+    && grep "HistoryIndexCacheSize=" /etc/zabbix/zabbix_server.conf
 sed -i '/^# TrendCacheSize=/c TrendCacheSize=64M' /etc/zabbix/zabbix_server.conf \
-    && echo "TrendCacheSize=64M"
+    && grep "TrendCacheSize=" /etc/zabbix/zabbix_server.conf
 sed -i '/^# ValueCacheSize=/c ValueCacheSize=128M' /etc/zabbix/zabbix_server.conf \
-    && echo "ValueCacheSize=128M"
+    && grep "ValueCacheSize=" /etc/zabbix/zabbix_server.conf
 
 #修改PHP配置
 sed -i 's/memory_limit 128M/memory_limit 256M/' /etc/httpd/conf.d/zabbix.conf \
-    && echo "php_value memory_limit 128M"
+    && grep "php_value memory_limit " /etc/httpd/conf.d/zabbix.conf | sed -e 's/^\s*//'
 sed -i 's/post_max_size 16M/post_max_size 32M/' /etc/httpd/conf.d/zabbix.conf \
-    && echo "php_value post_max_size 32M"
+    && grep "php_value post_max_size " /etc/httpd/conf.d/zabbix.conf | sed -e 's/^\s*//'
 sed -i 's/upload_max_filesize 2M/upload_max_filesize 4M/' /etc/httpd/conf.d/zabbix.conf \
-    && echo "php_value upload_max_filesize 4M"
-sed -i '/date.timezone/c\        php_value date.timezone Asia\/Shanghai' /etc/httpd/conf.d/zabbix.conf \
-    && echo "php_value date.timezone Asia/Shanghai"
+    && grep "php_value upload_max_filesize " /etc/httpd/conf.d/zabbix.conf | sed -e 's/^\s*//'
+sed -i '/php_value date.timezone/c\        php_value date.timezone Asia\/Shanghai' /etc/httpd/conf.d/zabbix.conf \
+    && grep "php_value date.timezone " /etc/httpd/conf.d/zabbix.conf | sed -e 's/^\s*//'
 
 #修改SELINUX配置
 #setsebool -P httpd_can_connect_zabbix on
