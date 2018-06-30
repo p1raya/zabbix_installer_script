@@ -209,7 +209,7 @@ esac
 case $NEED_GRAFANA in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
         #安装Grafana
-        yum install -q -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-5.1.4-1.x86_64.rpm > /dev/null
+        yum install -q -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-5.2.1-1.x86_64.rpm > /dev/null
         #安装Zabbix插件
         grafana-cli plugins install alexanderzobnin-zabbix-app > /dev/null && echo "Grafana 安装完成"
         #安装其它图形插件
