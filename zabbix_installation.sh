@@ -6,7 +6,7 @@
 #预设Zabbix数据库密码
 DB_PASSWORD='Passw0rd'
 
-#添加磁盘作为独立数据库分区（无需要添加请置空）
+#添加磁盘作为独立数据库分区（无需添加请置空）
 DISK_MYSQL="/dev/sdb"
 
 #是否在安装前更新系统？(Yes or No)
@@ -54,7 +54,7 @@ case $NEED_UPDATE in
         ;;
 esac
 echo "下载并安装 Zabbix 及相关依赖软件包"
-yum install -q -y http://repo.zabbix.com/zabbix/3.4/rhel/7/x86_64/zabbix-release-3.4-2.el7.noarch.rpm
+yum install -q -y https://repo.zabbix.com/zabbix/4.0/rhel/7/x86_64/zabbix-release-4.0-1.el7.noarch.rpm
 yum install -q -y mariadb-server zabbix-server-mysql zabbix-web-mysql zabbix-agent net-snmp net-snmp-utils ntp \
     && echo "Zabbix 软件包安装完成" || { echo "Zabbix 安装失败，请检查出错原因再重试。"; exit; }
 echo -e "\n开始进行软件配置..."
@@ -84,8 +84,8 @@ echo "create database zabbix character set utf8 collate utf8_bin;" | mysql -s -u
 #创建zabbix用户，并设置权限和密码
 echo "grant all privileges on zabbix.* to zabbix@localhost identified by '$DB_PASSWORD';" | mysql -s -uroot
 #导入zabbix数据
-zcat /usr/share/doc/zabbix-server-mysql-3.4.*/create.sql.gz | mysql -s -uzabbix -p"$DB_PASSWORD" zabbix \
-    && echo "Zabbix 数据库导入成功"
+zcat /usr/share/doc/zabbix-server-mysql*/create.sql.gz | mysql -s -uzabbix -p"$DB_PASSWORD" zabbix \
+    && echo "Zabbix 数据库导入成功" || { echo "Zabbix 数据库导入失败，请检查原因再重试。"; exit; }
 
 if [ -f "zabbix-mysql.sql" ]; then
     #zabbix数据表分区
@@ -98,7 +98,7 @@ fi
 }&
 
 {
-#修改Zabbix服务器配置（非最优配置，请按需要自行修改）
+#修改Zabbix服务器配置（非*最优*配置，请按需要自行修改）
 #修改数据库密码
 sed -i "/^# DBPassword=/c DBPassword=$DB_PASSWORD" /etc/zabbix/zabbix_server.conf
 #其它配置优化
@@ -209,7 +209,7 @@ esac
 case $NEED_GRAFANA in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
         #安装Grafana
-        yum install -q -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-5.2.2-1.x86_64.rpm > /dev/null
+        yum install -q -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-5.3.1-1.x86_64.rpm > /dev/null
         #安装Zabbix插件
         grafana-cli plugins install alexanderzobnin-zabbix-app > /dev/null && echo "Grafana 安装完成"
         #安装其它图形插件
