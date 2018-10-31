@@ -220,7 +220,7 @@ gpgkey=https://packagecloud.io/gpg.key https://grafanarel.s3.amazonaws.com/RPM-G
 sslverify=1
 sslcacert=/etc/pki/tls/certs/ca-bundle.crt
 EOF
-        #国内YUM Repository方式安装可能会因为网络原因失败，可直接通过YUM直接下软件包安装（注意更新版本）
+        #国内YUM Repository方式安装可能会因网络问题失败，可通过YUM直接下软件包安装（注意更新版本）
         #yum install -q -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-5.3.2-1.x86_64.rpm > /dev/null
         yum install -q -y grafana > /dev/null || { echo "Grafana 安装失败"; exit; }
         #安装Zabbix插件
