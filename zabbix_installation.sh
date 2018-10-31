@@ -209,7 +209,20 @@ esac
 case $NEED_GRAFANA in
     yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
         #安装Grafana
-        yum install -q -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-5.3.1-1.x86_64.rpm > /dev/null
+        cat > /etc/yum.repos.d/grafana.repo <<EOF
+[grafana]
+name=grafana
+baseurl=https://packagecloud.io/grafana/stable/el/7/\$basearch
+repo_gpgcheck=1
+enabled=1
+gpgcheck=1
+gpgkey=https://packagecloud.io/gpg.key https://grafanarel.s3.amazonaws.com/RPM-GPG-KEY-grafana
+sslverify=1
+sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+EOF
+        #国内YUM Repository方式安装可能会因为网络原因失败，可直接通过YUM直接下软件包安装（注意更新版本）
+        #yum install -q -y https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-5.3.2-1.x86_64.rpm > /dev/null
+        yum install -q -y grafana > /dev/null || { echo "Grafana 安装失败"; exit; }
         #安装Zabbix插件
         grafana-cli plugins install alexanderzobnin-zabbix-app > /dev/null && echo "Grafana 安装完成"
         #安装其它图形插件
