@@ -1,6 +1,7 @@
 #!/bin/bash
-#https://github.com/p1raya/zabbix_installer_script
-#此脚本只能用于CentOS 8，全新安装Zabbix Server和Grafana。
+# https://github.com/p1raya/zabbix_installer_script
+#此脚本适用于 CentOS 8 全新安装Zabbix Server和Grafana。
+#不同发行版的安装方法类似，可按需自行修改。
 
 #===以下为软件安装预设信息，需在安装前修改好===
 #预设Zabbix数据库密码
@@ -46,7 +47,7 @@ echo -e "\n开始进行软件安装..."
 yum install -q -y https://repo.zabbix.com/zabbix/4.3/rhel/8/x86_64/zabbix-release-4.3-3.el8.noarch.rpm
 yum install -q -y epel-release
 case $NEED_UPDATE in
-    yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
+    yes|Yes|YEs|YES|Y|y)
         yum -q -y update && echo "系统更新完成"
         ;;
 esac
@@ -170,7 +171,7 @@ ln -fs /usr/share/fonts/SourceHanSansCN/SourceHanSansCN-Normal.otf /etc/alternat
 
 {
 case $NEED_WECHAT in
-    yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
+    yes|Yes|YEs|YES|Y|y)
         #安装 python3 和requests 库
         yum install -q -y python3 python3-requests
         pip3 install -q --upgrade requests
@@ -185,7 +186,7 @@ case $NEED_WECHAT in
 esac
 
 case $NEED_GRAFANA in
-    yes|Yes|YEs|YES|Y|y|ye|YE|Ye)
+    yes|Yes|YEs|YES|Y|y)
         #安装Grafana
         echo "安装 Grafana..."
         cat > /etc/yum.repos.d/grafana.repo <<EOF
