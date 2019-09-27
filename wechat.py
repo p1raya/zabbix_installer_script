@@ -23,7 +23,6 @@ class WeChat:
         _req = requests.post(_url, params=_values)
         if _req.json()['errcode'] != 0:
             print(_req.json())
-            return False
         else:
             data = json.loads(_req.text)
             return data["access_token"]
@@ -52,8 +51,7 @@ class WeChat:
         try:
             _token = self.get_access_token()
         except:
-            print("获取access_token失败！")
-            return False
+            sys.exit("获取 access_token 失败！")
         else:
             _url = 'https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=' + _token
             _data = {
@@ -69,7 +67,6 @@ class WeChat:
             respone = requests.post(_url, _values)
             respone = respone.json()   #用.json()将respone的json串转换成字典
             return respone["errmsg"]
-
 
 if __name__ == '__main__':
     User = sys.argv[1]
