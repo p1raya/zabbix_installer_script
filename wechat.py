@@ -21,10 +21,10 @@ class WeChat:
                   'corpsecret': self.SECRET,
                   }
         _req = requests.post(_url, params=_values)
-        if _req.json()['errcode'] != 0:
-            print(_req.json())
+        data = json.loads(_req.text)
+        if data['errcode'] != 0:
+            print(_req.text)
         else:
-            data = json.loads(_req.text)
             return data["access_token"]
 
     def get_access_token(self):
