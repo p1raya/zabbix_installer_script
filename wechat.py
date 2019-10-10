@@ -28,11 +28,12 @@ class WeChat:
             return data["access_token"]
 
     def get_access_token(self):
+        TokenFile = '/tmp/.wechat_access_token'
         try:
-            with open('/tmp/.wechat_access_token', 'r') as f:
+            with open(TokenFile, 'r') as f:
                 tt, access_token = f.read().split()
         except:
-            with open('/tmp/.wechat_access_token', 'w') as f:
+            with open(TokenFile, 'w') as f:
                 access_token = self._get_access_token()
                 curr_time = time.time()
                 f.write('\t'.join([str(curr_time), access_token]))
@@ -42,7 +43,7 @@ class WeChat:
             if (0 < curr_time - float(tt) < 7260):
                 return access_token
             else:
-                with open('/tmp/.wechat_access_token', 'w') as f:
+                with open(TokenFile, 'w') as f:
                     access_token = self._get_access_token()
                     f.write('\t'.join([str(curr_time), access_token]))
                     return access_token
