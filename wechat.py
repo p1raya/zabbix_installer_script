@@ -21,7 +21,7 @@ class WeChat:
                   'corpsecret': self.SECRET,
                   }
         _req = requests.post(_url, params=_values)
-        data = json.loads(_req.text)
+        data = _req.json()
         if data['errcode'] != 0:
             print(_req.text)
         else:
@@ -39,7 +39,7 @@ class WeChat:
                 return access_token
         else:
             curr_time = time.time()
-            if 0 < curr_time - float(tt) < 7260:
+            if (0 < curr_time - float(tt) < 7260):
                 return access_token
             else:
                 with open('/tmp/.wechat_access_token', 'w') as f:
@@ -64,8 +64,8 @@ class WeChat:
                 "safe": "0"
                 }
             _values=(bytes(json.dumps(_data), 'utf-8'))
-            respone = requests.post(_url, _values)
-            respone = respone.json()   #用.json()将respone的json串转换成字典
+            _req = requests.post(_url, _values)
+            respone = _req.json()
             return respone["errmsg"]
 
 if __name__ == '__main__':
