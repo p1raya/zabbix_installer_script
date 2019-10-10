@@ -50,11 +50,11 @@ class WeChat:
 
     def send_data(self, User, Subject, Message):
         try:
-            _token = self.get_access_token()
+            access_token = self.get_access_token()
         except:
             sys.exit("获取 access_token 失败！")
         else:
-            _url = 'https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=' + _token
+            _url = 'https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=' + access_token
             _data = {
                 "touser": User,
                 "msgtype": "text",
@@ -64,7 +64,7 @@ class WeChat:
                     },
                 "safe": "0"
                 }
-            _values=(bytes(json.dumps(_data), 'utf-8'))
+            _values = bytes(json.dumps(_data), 'utf-8')
             _req = requests.post(_url, _values)
             respone = _req.json()
             return respone["errmsg"]
