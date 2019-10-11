@@ -14,6 +14,8 @@ class WeChat:
         self.SECRET = '***Your Secret***'
         #在此填入消息应用的agentid
         self.AGENTID = '1'
+        #指定access_token缓存文件路径
+        self.TokenFile = '/tmp/.wechat_access_token'
 
     def _get_access_token(self):
         _url = 'https://qyapi.weixin.qq.com/cgi-bin/gettoken'
@@ -21,38 +23,44 @@ class WeChat:
                   'corpsecret': self.SECRET,
                   }
         _req = requests.post(_url, params=_values)
-        data = _req.json()
+        data = json.loads(_req.text)
         if data['errcode'] != 0:
             print(_req.text)
         else:
             return data["access_token"]
 
     def get_access_token(self):
-        TokenFile = '/tmp/.wechat_access_token'
         try:
-            with open(TokenFile, 'r') as f:
+            with open(self.TokenFile, 'r') as f:
                 tt, access_token = f.read().split()
         except:
-            with open(TokenFile, 'w') as f:
+            with open(self.TokenFile, 'w') as f:
                 access_token = self._get_access_token()
                 curr_time = time.time()
                 f.write('\t'.join([str(curr_time), access_token]))
                 return access_token
         else:
             curr_time = time.time()
-            if (0 < curr_time - float(tt) < 7260):
+            if 0 < curr_time - float(tt) < 7260:
                 return access_token
             else:
-                with open(TokenFile, 'w') as f:
+                with open(self.TokenFile, 'w') as f:
                     access_token = self._get_access_token()
                     f.write('\t'.join([str(curr_time), access_token]))
                     return access_token
+
+    def renew_access_token(self):
+        with open(self.TokenFile, 'w') as f:
+            access_token = self._get_access_token()
+            curr_time = time.time()
+            f.write('\t'.join([str(curr_time), access_token]))
+            return access_token
 
     def send_data(self, User, Subject, Message):
         try:
             access_token = self.get_access_token()
         except:
-            sys.exit("获取 access_token 失败！")
+            sys.exit("获取access_token失败！")
         else:
             _url = 'https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=' + access_token
             _data = {
@@ -66,8 +74,7 @@ class WeChat:
                 }
             _values = bytes(json.dumps(_data), 'utf-8')
             _req = requests.post(_url, _values)
-            respone = _req.json()
-            return respone["errmsg"]
+            return(json.loads(_req.text))
 
 if __name__ == '__main__':
     User = sys.argv[1]
@@ -75,4 +82,11 @@ if __name__ == '__main__':
     Message = str(sys.argv[3])
     wx = WeChat()
     log = wx.send_data(User, Subject, Message)
-    print(log)
+    #如果access_token过期或错误，重试一次
+    if log['errcode'] == 42001 or log['errcode'] == 40014:
+        wx.renew_access_token()
+        log = wx.send_data(User, Subject, Message)
+    if log['errcode'] == 0:
+        print(log['errmsg'])
+    else:
+        print(log)
