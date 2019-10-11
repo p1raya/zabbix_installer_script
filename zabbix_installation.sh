@@ -44,16 +44,16 @@ fi
 
 #配置软件源，安装所需软件
 echo -e "\n开始进行软件安装..."
-yum install -q -y https://repo.zabbix.com/zabbix/4.3/rhel/8/x86_64/zabbix-release-4.3-3.el8.noarch.rpm
-yum install -q -y epel-release
+yum install -q -y https://repo.zabbix.com/zabbix/4.4/rhel/8/x86_64/zabbix-release-4.4-1.el8.noarch.rpm
 case $NEED_UPDATE in
     yes|Yes|YEs|YES|Y|y)
         yum -q -y update && echo "系统更新完成"
         ;;
 esac
 echo "安装 Zabbix 服务及相关依赖软件包"
-yum install -q -y mariadb-server zabbix-server-mysql zabbix-web-mysql zabbix-nginx-conf zabbix-agent net-snmp net-snmp-utils\
-    && echo "Zabbix 软件包安装完成" || { echo "Zabbix 安装失败，请检查出错原因再重试。"; exit; }
+yum install -q -y mariadb-server nginx zabbix-server-mysql zabbix-web-mysql zabbix-nginx-conf\
+                  zabbix-agent net-snmp net-snmp-utils && echo "Zabbix 软件包安装完成"\
+		  || { echo "Zabbix 安装失败，请检查出错原因再重试。"; exit; }
 echo -e "\n开始进行软件配置..."
 
 {
