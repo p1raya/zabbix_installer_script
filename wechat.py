@@ -15,7 +15,6 @@ class WeChat:
         #在此填入消息应用的agentid
         self.AGENTID = '1'
         #指定access_token缓存文件路径
-        #指定access_token缓存文件路径
         self.TOKENFILE = '/tmp/.wechat_access_token'
 
     def get_access_token(self):
