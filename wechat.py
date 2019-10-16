@@ -27,7 +27,7 @@ class WeChat:
                 try:
                     with open(self.TOKENFILE, 'w') as f:
                         f.write('\t'.join([str(time.time()), data["access_token"]]))
-                except IOError as err:
+                except:
                     print("文件" + self.TOKENFILE + "写入出错！")
                 return data["access_token"]
         sys.exit("请求access_token失败！")
