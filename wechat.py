@@ -82,7 +82,7 @@ if __name__ == '__main__':
     log = wx.send_message(User, Subject, Message)
     try:
         with open(LOGFILE, 'a+') as f:
-            f.write(' '.join([send_time, User, '->', Subject.replace('\n',' ')]) + '\n'\
-                    + log + '\n\n')
+            f.write(' '.join([send_time, User, '->', Subject.replace('\n',' ')])\
+                    + '\n' + log + '\n\n')
     except:
         print(log)
