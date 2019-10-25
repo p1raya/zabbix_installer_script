@@ -48,7 +48,7 @@ class WeChat:
         try:
             access_token = self.read_access_token()
         except:
-            sys.exit("获取access_token失败！")
+            return("获取access_token失败！")
         else:
             url = 'https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token='
             data = {
@@ -67,19 +67,22 @@ class WeChat:
                 try:
                     access_token = self.get_access_token()
                 except:
-                    sys.exit("更新access_token失败！")
+                    return("更新access_token失败！")
                 else:
                     req = requests.post(url + access_token, values)
-                    response = json.loads(req.text)
-            return response
+            return req.text
 
 if __name__ == '__main__':
     User = sys.argv[1]
     Subject = str(sys.argv[2])
     Message = str(sys.argv[3])
+    LOGFILE = '/tmp/Wechat_Message.log'
     wx = WeChat()
+    send_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     log = wx.send_message(User, Subject, Message)
-    if log['errcode'] == 0:
-        print(log['errmsg'])
-    else:
+    try:
+        with open(LOGFILE, 'a+') as f:
+            f.write(' '.join([send_time, User, '->', Subject.replace('\n',' ')]) + '\n'\
+                    + log + '\n\n')
+    except:
         print(log)
