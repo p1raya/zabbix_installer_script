@@ -44,7 +44,8 @@ fi
 
 #配置软件源，安装所需软件
 echo -e "\n开始进行软件安装..."
-yum install -q -y https://repo.zabbix.com/zabbix/4.4/rhel/8/x86_64/zabbix-release-4.4-1.el8.noarch.rpm
+dnf install -q -y https://mirrors.aliyun.com/zabbix/zabbix/5.0/rhel/8/x86_64/zabbix-release-5.0-1.el8.noarch.rpm
+sed -i 's@repo.zabbix.com@mirrors.aliyun.com/zabbix@g' /etc/yum.repos.d/zabbix.repo
 case $NEED_UPDATE in
     yes|Yes|YEs|YES|Y|y)
         yum -q -y update && echo "系统更新完成"
